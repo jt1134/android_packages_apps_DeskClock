@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
@@ -42,6 +43,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.preference.PreferenceManager;
 import android.view.ActionMode;
 import android.view.ActionMode.Callback;
 import android.view.LayoutInflater;
@@ -85,6 +87,7 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
     private static final String KEY_PREVIOUS_DAY_MAP = "previousDayMap";
     private static final String KEY_SELECTED_ALARM = "selectedAlarm";
     private static final String KEY_DELETE_CONFIRMATION = "deleteConfirmation";
+    private static final String KEY_CLING = "BedtimeCling";
 
     private static final int REQUEST_CODE_RINGTONE = 1;
     private static final int REQUEST_CODE_PROFILE = 2;
@@ -594,6 +597,9 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
             TextView ringtone;
             TextView profile;
             View hairLine;
+            CheckBox suggested;
+            LinearLayout suggestedTimesContainer;
+            TextView sleepTimes;
 
             // Other states
             Alarm alarm;
@@ -715,6 +721,10 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
             holder.clickableLabel = (TextView) view.findViewById(R.id.edit_label);
             holder.hairLine = view.findViewById(R.id.hairline);
             holder.repeatDays = (LinearLayout) view.findViewById(R.id.repeat_days);
+            holder.suggested = (CheckBox) view.findViewById(R.id.suggested_times_onoff);
+            holder.suggestedTimesContainer = (LinearLayout) view
+                    .findViewById(R.id.suggested_times_container);
+            holder.sleepTimes = (TextView) view.findViewById(R.id.suggested_times);
 
             // Build button for each day.
             for (int i = 0; i < 7; i++) {
@@ -780,6 +790,8 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
             itemHolder.onoff.setOnLongClickListener(mLongClickListener);
 
             itemHolder.clock.updateTime(alarm.hour, alarm.minutes);
+            // This needs to be called after updateTime
+            bindSuggestedTimes(itemHolder);
             itemHolder.clock.setClickable(true);
             itemHolder.clock.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -873,6 +885,11 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
             });
         }
 
+        private void bindSuggestedTimes(final ItemHolder itemHolder) {
+            final String times = itemHolder.clock.getSuggestedSleepTimes();
+            itemHolder.sleepTimes.setText(times);
+        }
+
         private void bindExpandArea(final ItemHolder itemHolder, final Alarm alarm) {
             // Views in here are not bound until the item is expanded.
 
@@ -943,6 +960,24 @@ public class AlarmClock extends Activity implements LoaderManager.LoaderCallback
                 }
             });
             itemHolder.repeat.setOnLongClickListener(mLongClickListener);
+
+            itemHolder.suggested.setOnClickListener(new View.OnClickListener() {
+
+                @Override
+                public void onClick(View view) {
+                    final boolean checked = ((CheckBox) view).isChecked();
+                    if (checked) {
+                        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
+                        if (!prefs.getBoolean(KEY_CLING, false)) {
+                            BedtimeCling.newInstance().show(getFragmentManager(), KEY_CLING);
+                            prefs.edit().putBoolean(KEY_CLING, true).apply();
+                        }
+                        itemHolder.suggestedTimesContainer.setVisibility(View.VISIBLE);
+                    } else {
+                        itemHolder.suggestedTimesContainer.setVisibility(View.GONE);
+                    }
+                }
+            });
 
             updateDaysOfWeekButtons(itemHolder, alarm.daysOfWeek);
             for (int i = 0; i < 7; i++) {
